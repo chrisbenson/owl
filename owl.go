@@ -8,6 +8,7 @@ import (
   "net"
   "net/mail"
   "net/smtp"
+  "github.com/sourcegraph/go-ses"
 )
 
 type provider string
@@ -41,20 +42,29 @@ type Sender interface {
 }
 
 func (m *Message) Send(p *Params) error {
-  var err error
-  provider := p.Provider
-  switch provider {
-  case SMTP:
-      //err = sendToSMTP(m, p)
-      err = test(m, p)
-    case AWSSMTP:
-      err = sendToAWSSMTP(m, p)
-    case AWSSES:
-      err = sendToAWSSES(m, p)
-    default:
-      err = errors.New("No email provider was provided.")
+  // var err error
+  // provider := p.Provider
+  // err := sendToAWSSES(m, p)
+
+  // for testing/debugging
+  err := sendToConsole(m, p)
+
+  // switch provider {
+  // case SMTP:
+  //     //err = sendToSMTP(m, p)
+  //     err = test(m, p)
+  //   case AWSSMTP:
+  //     err = sendToAWSSMTP(m, p)
+  //   case AWSSES:
+  //     err = sendToAWSSES(m, p)
+  //   default:
+  //     err = errors.New("No email provider was provided.")
+  // }
+  if err != nil {
+    return errors.New("switch p.Provider | " + err.Error())
   }
-  return errors.New("switch p.Provider | " + err.Error())
+
+  return nil
 }
 
 /*
@@ -87,9 +97,43 @@ func sendToAWSSMTP(m *Message, p *Params) error {
 
 // AWS-SES
 func sendToAWSSES(m *Message, p *Params) error {
-  return errors.New("AWS SES not implemented yet.")
+
+  var provider ses.Config
+  var result string
+  var err error
+
+  if p.Provider == "" || p.ID == "" || p.Password == "" {
+    provider = ses.EnvConfig
+  } else {
+    provider = ses.Config{
+      Endpoint: string(p.Provider),
+      AccessKeyID: p.ID,
+      SecretAccessKey: p.Password}
+  }
+
+  if m.HTML {
+    result, err = provider.SendEmailHTML(m.From, m.To[0], m.Subject, m.Body, m.Body)
+  } else {
+    result, err = provider.SendEmail(m.From, m.To[0], m.Subject, m.Body)
+  }
+
+  fmt.Println(result)
+
+  if err != nil {
+    return err
+  }
+
+  return nil
+
 }
 
+func sendToConsole(m *Message, p *Params) error {
+  fmt.Println("From: " + m.From)
+  fmt.Println("To: " + m.To[0])
+  fmt.Println("Subject: " + m.Subject)
+  fmt.Println(m.Body)
+  return nil
+}
 
 func test(m *Message, p *Params) error {
 
